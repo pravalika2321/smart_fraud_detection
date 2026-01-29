@@ -12,10 +12,14 @@ Fill in the following details in the Render dashboard:
 
 | Field | Value |
 | :--- | :--- |
-| **Name** | `smart-fraud-detection` (or your choice) |
-| **Runtime** | `Node` |
-| **Build Command** | `npm install && npm run build` |
+| **Name** | `smart-fraud-detection` |
+| **Branch** | `main` |
+| **Root Directory** |  (Leave empty) |
+| **Build Command** | `npm run build` |
 | **Publish Directory** | `dist` |
+
+> [!IMPORTANT]
+> Make sure you select **Static Site** (not Web Service). Static sites are free and do not have a "Runtime" setting.
 
 ## 3. Add Environment Variables
 This is critical for the AI analysis to work:
