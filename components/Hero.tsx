@@ -47,36 +47,37 @@ const Hero: React.FC<HeroProps> = ({ onCtaClick }) => {
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative group">
+          {/* Background decorative elements */}
           <div className="absolute top-0 -left-4 w-72 h-72 bg-blue-400 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob"></div>
           <div className="absolute top-0 -right-4 w-72 h-72 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
           <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-blob animation-delay-4000"></div>
           
-          <div className="relative bg-white rounded-2xl shadow-2xl p-6 border border-slate-100 transform rotate-2">
-            <div className="flex items-center justify-between mb-4 pb-4 border-b">
-              <div className="flex space-x-1">
-                <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                <div className="w-3 h-3 rounded-full bg-green-400"></div>
-              </div>
-              <span className="text-xs font-mono text-slate-400">security_scanner.ai</span>
+          <div className="relative">
+            {/* Main Image Container */}
+            <div className="relative rounded-[2rem] overflow-hidden shadow-2xl border-8 border-white/50 transform rotate-1 group-hover:rotate-0 transition-transform duration-700">
+              <img 
+                src="https://images.unsplash.com/photo-1499750310107-5fef28a66643?auto=format&fit=crop&q=80&w=1000&h=700" 
+                alt="Workspace" 
+                className="w-full h-auto object-cover scale-105 group-hover:scale-100 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-tr from-slate-900/20 to-transparent"></div>
             </div>
-            <div className="space-y-4">
-              <div className="h-4 bg-slate-100 rounded w-3/4"></div>
-              <div className="h-4 bg-slate-100 rounded w-1/2"></div>
-              <div className="h-24 bg-blue-50 rounded flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">89.4%</div>
-                  <div className="text-[10px] text-blue-400 uppercase font-bold">Confidence Score</div>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <div className="h-8 bg-red-100 rounded flex-grow flex items-center justify-center text-red-600 text-[10px] font-bold">HIGH RISK DETECTED</div>
-              </div>
-              <div className="space-y-2">
-                <div className="h-2 bg-slate-100 rounded w-full"></div>
-                <div className="h-2 bg-slate-100 rounded w-5/6"></div>
-              </div>
+
+            {/* Floating Accuracy Badge (Matching the user's provided image) */}
+            <div className="absolute -bottom-6 -left-6 md:-left-12 max-w-[280px] md:max-w-[320px] bg-white rounded-3xl p-6 md:p-8 shadow-2xl shadow-blue-900/10 border border-slate-100 animate-float">
+               <div className="flex flex-col space-y-2">
+                 <h3 className="text-2xl md:text-3xl font-extrabold text-slate-800">
+                   99.2% Accuracy
+                 </h3>
+                 <p className="text-sm md:text-base text-slate-500 leading-relaxed font-medium">
+                   Validated against 10,000+ confirmed job scams and fake internship listings.
+                 </p>
+               </div>
+               <div className="mt-4 flex items-center space-x-2 text-blue-600 font-bold text-xs uppercase tracking-widest">
+                  <i className="fas fa-shield-check"></i>
+                  <span>Verified System</span>
+               </div>
             </div>
           </div>
         </div>

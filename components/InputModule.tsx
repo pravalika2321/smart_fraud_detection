@@ -8,6 +8,7 @@ interface InputModuleProps {
 
 const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
   const [activeTab, setActiveTab] = useState<'manual' | 'email' | 'file'>('manual');
+  const [loadingFile, setLoadingFile] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     company: '',
@@ -24,14 +25,31 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string || '');
+      reader.onerror = (e) => reject(new Error("Failed to read file"));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     let finalData: JobInputData;
     
     if (activeTab === 'manual') {
+      if (!formData.description || !formData.title) {
+        alert("Please fill in the required fields.");
+        return;
+      }
       finalData = { ...formData, sourceType: 'manual' };
     } else if (activeTab === 'email') {
+      if (emailContent.length < 20) {
+        alert("Please paste the full email content for a more accurate analysis.");
+        return;
+      }
       finalData = {
         title: 'Extracted from Email',
         company: 'Unknown',
@@ -43,16 +61,31 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
         sourceType: 'email'
       };
     } else {
-      finalData = {
-        title: selectedFile ? selectedFile.name : 'Uploaded Document',
-        company: 'Extracted from File',
-        salary: 'N/A',
-        location: 'N/A',
-        email: 'N/A',
-        website: 'N/A',
-        description: `Analysis request for file: ${selectedFile?.name}`,
-        sourceType: 'file'
-      };
+      if (!selectedFile) {
+        alert("Please select a file first.");
+        return;
+      }
+      
+      setLoadingFile(true);
+      try {
+        // For production, we'd use a lib for PDF/DOCX, but for now we read text content
+        const content = await readFileContent(selectedFile);
+        finalData = {
+          title: selectedFile.name,
+          company: 'Extracted from File',
+          salary: 'N/A',
+          location: 'N/A',
+          email: 'N/A',
+          website: 'N/A',
+          description: content || `Analysis request for file: ${selectedFile.name}`,
+          sourceType: 'file'
+        };
+      } catch (err) {
+        alert("Could not read file content. Please try pasting the text instead.");
+        setLoadingFile(false);
+        return;
+      }
+      setLoadingFile(false);
     }
 
     onAnalyze(finalData);
@@ -176,7 +209,7 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
           <div className="py-12 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 hover:bg-slate-100 transition cursor-pointer" onClick={() => document.getElementById('fileInput')?.click()}>
             <i className="fas fa-cloud-upload-alt text-4xl text-blue-400 mb-4"></i>
             <p className="text-slate-600 font-medium">{selectedFile ? selectedFile.name : 'Click to select a file (PDF, DOCX, TXT)'}</p>
-            <p className="text-xs text-slate-400 mt-2">Max file size: 5MB</p>
+            <p className="text-xs text-slate-400 mt-2">Max file size: 5MB. Note: PDF/DOCX content extraction is experimental.</p>
             <input 
               id="fileInput"
               type="file" 
@@ -190,9 +223,10 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
         <div className="mt-8 flex justify-end">
           <button 
             type="submit"
-            className="px-10 py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition transform hover:scale-[1.02]"
+            disabled={loadingFile}
+            className={`px-10 py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg shadow-blue-100 hover:bg-blue-700 transition transform hover:scale-[1.02] ${loadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
-            Start Fraud Analysis <i className="fas fa-arrow-right ml-2"></i>
+            {loadingFile ? 'Processing File...' : <>Start Fraud Analysis <i className="fas fa-arrow-right ml-2"></i></>}
           </button>
         </div>
       </form>

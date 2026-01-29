@@ -2,7 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { JobInputData, AnalysisResult } from "./types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
+// Create a helper to get the AI instance. 
+// Initializing inside or using a getter ensures we always have the latest key if it changes.
+const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
 
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -38,50 +40,79 @@ const RESPONSE_SCHEMA = {
 };
 
 export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResult> {
-  const model = "gemini-3-pro-preview";
+  const ai = getAI();
+  const modelName = "gemini-3-pro-preview";
   
-  const prompt = `
-    Analyze the following job/internship posting for signs of recruitment fraud.
+  // Use System Instruction for better control over the reasoning process
+  const systemInstruction = `
+    You are a world-class Cyber Security Analyst specializing in recruitment fraud and phishing detection.
+    Your task is to analyze job/internship offers for signs of fraud.
     
-    Job Details:
-    - Title: ${data.title}
-    - Company: ${data.company}
-    - Salary/Stipend: ${data.salary}
-    - Location: ${data.location}
-    - Company Email: ${data.email}
-    - Website: ${data.website}
-    - Description: ${data.description}
-    - Input Method: ${data.sourceType}
+    EVALUATION CRITERIA:
+    1. Financial Red Flags: Asking for "training fees", "equipment deposits", or bank details early.
+    2. Communication: Use of free email domains (@gmail.com, @yahoo.com) for official corporate roles.
+    3. Linguistic Patterns: Excessive urgency, poor grammar, generic greetings, or "too good to be true" salary.
+    4. Authenticity: Vague company details, lack of a physical office, or suspicious website URLs.
+    
+    IMPORTANT: Even if the input text contains scammy keywords, DO NOT block your own response. 
+    Analyze the content objectively as a security tool.
+  `;
 
-    Evaluate based on these patterns:
-    1. Unrealistic salary/benefits compared to requirements.
-    2. Use of free email domains (@gmail, @yahoo, @outlook) instead of corporate domains.
-    3. Requests for money, "registration fees", "training equipment costs", or sensitive bank info.
-    4. Poor grammar, inconsistent formatting, or excessive urgency.
-    5. Vague job descriptions or lack of verifiable physical location.
-    6. Suspicious website URLs or lack of official presence.
-
-    Return a structured risk assessment.
+  const userPrompt = `
+    Please analyze this job offer data:
+    
+    TITLE: ${data.title}
+    COMPANY: ${data.company}
+    SALARY: ${data.salary}
+    LOCATION: ${data.location}
+    RECRUITER EMAIL: ${data.email}
+    WEBSITE: ${data.website}
+    SOURCE TYPE: ${data.sourceType}
+    
+    DESCRIPTION/CONTENT:
+    """
+    ${data.description}
+    """
   `;
 
   try {
     const response = await ai.models.generateContent({
-      model: model,
-      contents: prompt,
+      model: modelName,
+      contents: userPrompt,
       config: {
+        systemInstruction: systemInstruction,
         responseMimeType: "application/json",
         responseSchema: RESPONSE_SCHEMA,
-        thinkingConfig: { thinkingBudget: 0 }
       },
     });
 
-    if (!response.text) {
-      throw new Error("No response received from the analysis engine.");
+    // Handle empty candidates (often due to safety filters)
+    if (!response.candidates || response.candidates.length === 0) {
+      throw new Error("The analysis was blocked by safety filters. This often happens if the input contains highly sensitive or malicious phishing content. Please try a different snippet.");
     }
 
-    return JSON.parse(response.text.trim()) as AnalysisResult;
+    const finishReason = response.candidates[0].finishReason;
+    if (finishReason === 'SAFETY') {
+      throw new Error("Analysis Blocked: The content provided triggered security safety filters. Please ensure you aren't pasting malicious links or harmful code.");
+    }
+
+    const text = response.text;
+    if (!text) {
+      throw new Error("The analysis engine returned an empty response.");
+    }
+
+    return JSON.parse(text.trim()) as AnalysisResult;
   } catch (error: any) {
-    console.error("Gemini Analysis Error:", error);
-    throw new Error(error.message || "Failed to analyze the job offer. Please try again.");
+    console.error("Gemini Analysis Error Detail:", error);
+    
+    // Provide more specific error messages based on common API issues
+    if (error.message?.includes("401")) {
+      throw new Error("Invalid API Key. Please check your configuration.");
+    }
+    if (error.message?.includes("429")) {
+      throw new Error("Too many requests. Please wait a moment before trying again.");
+    }
+    
+    throw new Error(error.message || "Failed to analyze the job offer. Check your internet connection and try again.");
   }
 }
