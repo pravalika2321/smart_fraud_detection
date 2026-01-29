@@ -1,7 +1,8 @@
-
-import React from 'react';
+import React, { useRef } from 'react';
 import { AnalysisResult, RiskLevel } from '../types';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 interface ResultsViewProps {
   loading: boolean;
@@ -11,7 +12,57 @@ interface ResultsViewProps {
 }
 
 const ResultsView: React.FC<ResultsViewProps> = ({ loading, result, error, onReset }) => {
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  const handleDownload = async () => {
+    if (!reportRef.current || !result) return;
+
+    try {
+      const element = reportRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#f8fafc' // matches slate-50
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgProps = pdf.getImageProperties(imgData);
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.save(`FraudGuard_Report_${result.result.replace(/\s+/g, '_')}.pdf`);
+    } catch (err) {
+      console.error("PDF Generation failed:", err);
+      alert("Failed to generate PDF. Please try again.");
+    }
+  };
+
+  const handleShare = async () => {
+    if (!result) return;
+
+    const shareData = {
+      title: 'FraudGuard Analysis Result',
+      text: `Analysis Result: ${result.result}\nRisk Level: ${result.risk_level}\nConfidence: ${result.confidence_score}%\n\nAnalyze your job offers at FraudGuard!`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+        alert('Results copied to clipboard!');
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+    }
+  };
+
   if (loading) {
+    // ... rest of the component ...
     return (
       <div className="max-w-4xl mx-auto px-4 py-20 text-center">
         <div className="mb-8 relative inline-block">
@@ -36,7 +87,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({ loading, result, error, onRes
         </div>
         <h2 className="text-2xl font-bold text-slate-800 mb-2">Analysis Failed</h2>
         <p className="text-slate-600 mb-8">{error}</p>
-        <button 
+        <button
           onClick={onReset}
           className="px-6 py-3 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 transition"
         >
@@ -65,7 +116,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({ loading, result, error, onRes
   };
 
   // Dynamic visual for the result
-  const statusImage = isFake 
+  const statusImage = isFake
     ? "https://images.unsplash.com/photo-1590479773265-7464e5d48118?auto=format&fit=crop&q=80&w=600&h=400" // Warning/Red tape
     : "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&q=80&w=600&h=400"; // Teamwork/Genuine
 
@@ -73,7 +124,7 @@ const ResultsView: React.FC<ResultsViewProps> = ({ loading, result, error, onRes
     <div className="max-w-5xl mx-auto px-4 py-12">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Status Card */}
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-8" ref={reportRef}>
           <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-100">
             {/* New Status Image Header */}
             <div className="h-48 w-full overflow-hidden relative">
@@ -119,10 +170,10 @@ const ResultsView: React.FC<ResultsViewProps> = ({ loading, result, error, onRes
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                     <div className="text-center">
-                       <div className={`text-xl font-bold ${isFake ? 'text-red-600' : 'text-green-600'}`}>{result.risk_rate}%</div>
-                       <div className="text-[8px] text-slate-400 font-bold uppercase">Risk Rate</div>
-                     </div>
+                    <div className="text-center">
+                      <div className={`text-xl font-bold ${isFake ? 'text-red-600' : 'text-green-600'}`}>{result.risk_rate}%</div>
+                      <div className="text-[8px] text-slate-400 font-bold uppercase">Risk Rate</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -146,45 +197,51 @@ const ResultsView: React.FC<ResultsViewProps> = ({ loading, result, error, onRes
           </div>
 
           <div className="bg-slate-900 rounded-2xl p-8 text-white shadow-xl">
-             <h3 className="text-xl font-bold mb-6 flex items-center text-blue-400">
-               <i className="fas fa-user-shield mr-2"></i> Safety Recommendations
-             </h3>
-             <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               {result.safety_tips.map((tip, i) => (
-                 <li key={i} className="flex items-center space-x-3 text-sm text-slate-300">
-                   <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></span>
-                   <span>{tip}</span>
-                 </li>
-               ))}
-             </ul>
+            <h3 className="text-xl font-bold mb-6 flex items-center text-blue-400">
+              <i className="fas fa-user-shield mr-2"></i> Safety Recommendations
+            </h3>
+            <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {result.safety_tips.map((tip, i) => (
+                <li key={i} className="flex items-center space-x-3 text-sm text-slate-300">
+                  <span className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
         {/* Action Sidebar */}
         <div className="space-y-6">
           <div className="bg-white rounded-2xl shadow-lg p-6 border border-slate-100">
-             <h4 className="font-bold text-slate-800 mb-4 uppercase text-xs tracking-widest">Next Actions</h4>
-             <div className="space-y-3">
-               <button className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition group">
-                 <span className="text-sm font-semibold text-slate-700">Download Report</span>
-                 <i className="fas fa-download text-slate-400 group-hover:text-blue-500"></i>
-               </button>
-               <button className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition group">
-                 <span className="text-sm font-semibold text-slate-700">Share Analysis</span>
-                 <i className="fas fa-share-nodes text-slate-400 group-hover:text-blue-500"></i>
-               </button>
-               <button 
-                 onClick={onReset}
-                 className="w-full mt-4 flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition"
-                >
-                 Analyze Another Job
-               </button>
-             </div>
+            <h4 className="font-bold text-slate-800 mb-4 uppercase text-xs tracking-widest">Next Actions</h4>
+            <div className="space-y-3">
+              <button
+                onClick={handleDownload}
+                className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition group"
+              >
+                <span className="text-sm font-semibold text-slate-700">Download Report</span>
+                <i className="fas fa-download text-slate-400 group-hover:text-blue-500"></i>
+              </button>
+              <button
+                onClick={handleShare}
+                className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 rounded-lg transition group"
+              >
+                <span className="text-sm font-semibold text-slate-700">Share Analysis</span>
+                <i className="fas fa-share-nodes text-slate-400 group-hover:text-blue-500"></i>
+              </button>
+              <button
+                onClick={onReset}
+                className="w-full mt-4 flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition"
+              >
+                Analyze Another Job
+              </button>
+            </div>
           </div>
 
           <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl p-6 text-white overflow-hidden relative group">
-            <img 
-              src="https://images.unsplash.com/photo-1454165833767-027ffea9e787?auto=format&fit=crop&q=80&w=400" 
+            <img
+              src="https://images.unsplash.com/photo-1454165833767-027ffea9e787?auto=format&fit=crop&q=80&w=400"
               className="absolute inset-0 w-full h-full object-cover opacity-10 group-hover:scale-110 transition-transform duration-700"
               alt="Background"
             />
