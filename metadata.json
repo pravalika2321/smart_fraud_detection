@@ -1,0 +1,7 @@
+{
+  "name": "Smart Fraud Detection Platform",
+  "description": "An AI-powered platform to analyze and detect fraudulent job and internship offers using advanced NLP and pattern recognition.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
