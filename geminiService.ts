@@ -2,15 +2,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { JobInputData, AnalysisResult, RiskLevel } from "./types";
 
-// Create a helper to get the AI instance.
 const getAI = () => {
   const key = import.meta.env.VITE_GEMINI_API_KEY || "";
-  console.log("Initializing Gemini with key length:", key.length);
-  // Using the object constructor for better compatibility
-  return new GoogleGenAI({ apiKey: key });
+  return new GoogleGenAI(key);
 };
 
-// DEMO DATA: Used if the API key is missing or the connection fails.
 const MOCK_RESULT: AnalysisResult = {
   result: "Genuine Job",
   confidence_score: 95,
@@ -36,59 +32,42 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
   }
 
   try {
-    console.log("Starting AI Analysis for:", data.title);
     const genAI = getAI();
-    const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        responseMimeType: "application/json",
-      }
-    });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const systemInstruction = `
       You are a world-class Cyber Security Analyst specializing in recruitment fraud.
       Analyze the job/internship offer for signs of fraud (scams, phishing, etc.).
       
-      EVALUATION CRITERIA:
-      1. Financial Red Flags: Asking for fees or bank details.
-      2. Communication: Use of free email domains for official roles.
-      3. Linguistic Patterns: Excessive urgency, poor grammar.
-      4. Authenticity: Vague company details.
-      
       RETURN JSON ONLY:
       {
         "result": "Fake Job" | "Genuine Job",
-        "confidence_score": number (0-100),
-        "risk_rate": number (0-100),
+        "confidence_score": number,
+        "risk_rate": number,
         "risk_level": "Low" | "Medium" | "High",
         "explanations": string[],
         "safety_tips": string[]
       }
     `;
 
-    const userPrompt = `Analysis Object: ${JSON.stringify(data)}`;
+    const userPrompt = `${systemInstruction}\n\nAnalysis Object: ${JSON.stringify(data)}`;
 
-    const result = await model.generateContent([systemInstruction, userPrompt]);
+    const result = await model.generateContent(userPrompt);
     const response = await result.response;
     const text = response.text();
 
-    console.log("Received AI Response:", text);
-
-    if (!text) {
-      throw new Error("Empty response from Gemini");
-    }
+    if (!text) throw new Error("Empty response");
 
     const parsed = JSON.parse(text.trim());
 
-    // Ensure risk_level matches the enum
+    // Enum mapping
     if (parsed.risk_level === 'Low') parsed.risk_level = RiskLevel.LOW;
-    if (parsed.risk_level === 'Medium') parsed.risk_level = RiskLevel.MEDIUM;
-    if (parsed.risk_level === 'High') parsed.risk_level = RiskLevel.HIGH;
+    else if (parsed.risk_level === 'Medium') parsed.risk_level = RiskLevel.MEDIUM;
+    else if (parsed.risk_level === 'High') parsed.risk_level = RiskLevel.HIGH;
 
     return parsed as AnalysisResult;
   } catch (error: any) {
     console.error("Gemini Error:", error);
-    // Always return something so the UI doesn't hang
     return MOCK_RESULT;
   }
 }
