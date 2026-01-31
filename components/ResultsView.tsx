@@ -140,6 +140,30 @@ const ResultsView: React.FC<ResultsViewProps> = ({ loading, result, error, onRes
               </div>
             </div>
 
+            {/* High Security Celebration Animation */}
+            {!isFake && result.risk_rate <= 10 && (
+              <div className="bg-gradient-to-r from-blue-600/10 via-indigo-600/10 to-blue-600/10 py-6 border-b border-blue-50 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5 animate-pulse"></div>
+                <div className="flex items-center justify-center space-x-6 relative z-10">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-blue-400 rounded-full blur-2xl animate-pulse opacity-20"></div>
+                    <img
+                      src="/secure_badge.png"
+                      alt="Verified Secure"
+                      className="w-24 h-24 object-contain animate-bounce transition-transform hover:scale-110 duration-500"
+                    />
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center space-x-2">
+                      <span className="flex h-3 w-3 rounded-full bg-blue-500 animate-ping"></span>
+                      <h4 className="text-xl font-black text-blue-900 tracking-tight italic">VERIFIED AS ELITE SECURE</h4>
+                    </div>
+                    <p className="text-sm font-medium text-blue-700/80 mt-1">This job offer shows zero major fraud indicators.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="p-8">
               <div className="flex flex-col md:flex-row items-center justify-between mb-8 gap-6">
                 <div>
