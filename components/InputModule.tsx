@@ -36,9 +36,9 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     let finalData: JobInputData;
-    
+
     if (activeTab === 'manual') {
       if (!formData.description || !formData.title) {
         alert("Please fill in the required fields.");
@@ -65,7 +65,7 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
         alert("Please select a file first.");
         return;
       }
-      
+
       setLoadingFile(true);
       try {
         const content = await readFileContent(selectedFile);
@@ -90,12 +90,32 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
     onAnalyze(finalData);
   };
 
-  // Helper to get dynamic input classes
-  const getInputClass = (value: string) => {
-    const base = "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-300 font-medium text-slate-200 placeholder-slate-500";
-    // Change background if value exists
-    const bgColor = value.length > 0 ? "bg-slate-700 border-blue-900/30" : "bg-slate-800 border-slate-700";
-    return `${base} ${bgColor}`;
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setSelectedFile(null);
+      return;
+    }
+
+    const allowedExtensions = ['.pdf', '.docx', '.txt'];
+    const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+    const maxSize = 5 * 1024 * 1024; // 5MB
+
+    if (!allowedExtensions.includes(extension)) {
+      alert(`Invalid file format. Please upload PDF, DOCX, or TXT.`);
+      e.target.value = ''; // Clear the input
+      setSelectedFile(null);
+      return;
+    }
+
+    if (file.size > maxSize) {
+      alert(`File is too large. Maximum size is 5MB.`);
+      e.target.value = ''; // Clear the input
+      setSelectedFile(null);
+      return;
+    }
+
+    setSelectedFile(file);
   };
 
   return (
@@ -105,11 +125,10 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-4 text-sm font-bold transition-colors ${
-              activeTab === tab 
-                ? 'bg-white text-blue-600 border-b-2 border-blue-600' 
+            className={`flex-1 py-4 text-sm font-bold transition-colors ${activeTab === tab
+                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
                 : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
-            }`}
+              }`}
           >
             {tab === 'manual' && <><i className="fas fa-edit mr-2"></i> Manual Input</>}
             {tab === 'email' && <><i className="fas fa-envelope mr-2"></i> Paste Email</>}
@@ -125,12 +144,12 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
               <label className="text-sm font-bold text-slate-800 flex items-center">
                 Job Title <span className="text-red-500 ml-1">*</span>
               </label>
-              <input 
+              <input
                 required
                 name="title"
                 value={formData.title}
                 onChange={handleManualChange}
-                placeholder="e.g. Senior Software Engineer" 
+                placeholder="e.g. Senior Software Engineer"
                 className={getInputClass(formData.title)}
               />
             </div>
@@ -138,52 +157,52 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
               <label className="text-sm font-bold text-slate-800">
                 Company Name <span className="text-red-500 ml-1">*</span>
               </label>
-              <input 
+              <input
                 required
                 name="company"
                 value={formData.company}
                 onChange={handleManualChange}
-                placeholder="e.g. Google" 
+                placeholder="e.g. Google"
                 className={getInputClass(formData.company)}
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-800">Salary / Stipend</label>
-              <input 
+              <input
                 name="salary"
                 value={formData.salary}
                 onChange={handleManualChange}
-                placeholder="e.g. $120,000 / year" 
+                placeholder="e.g. $120,000 / year"
                 className={getInputClass(formData.salary)}
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-800">Location</label>
-              <input 
+              <input
                 name="location"
                 value={formData.location}
                 onChange={handleManualChange}
-                placeholder="e.g. New York, NY" 
+                placeholder="e.g. New York, NY"
                 className={getInputClass(formData.location)}
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-800">Recruiter Email</label>
-              <input 
+              <input
                 name="email"
                 value={formData.email}
                 onChange={handleManualChange}
-                placeholder="e.g. hr@company.com" 
+                placeholder="e.g. hr@company.com"
                 className={getInputClass(formData.email)}
               />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-800">Website URL</label>
-              <input 
+              <input
                 name="website"
                 value={formData.website}
                 onChange={handleManualChange}
-                placeholder="e.g. https://company.com" 
+                placeholder="e.g. https://company.com"
                 className={getInputClass(formData.website)}
               />
             </div>
@@ -191,13 +210,13 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
               <label className="text-sm font-bold text-slate-800">
                 Job Description <span className="text-red-500 ml-1">*</span>
               </label>
-              <textarea 
+              <textarea
                 required
                 name="description"
                 value={formData.description}
                 onChange={handleManualChange}
                 rows={5}
-                placeholder="Paste the full job description here..." 
+                placeholder="Paste the full job description here..."
                 className={getInputClass(formData.description)}
               ></textarea>
             </div>
@@ -209,19 +228,19 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
             <label className="text-sm font-bold text-slate-800">
               Recruitment Email Content <span className="text-red-500 ml-1">*</span>
             </label>
-            <textarea 
+            <textarea
               required
               value={emailContent}
               onChange={(e) => setEmailContent(e.target.value)}
               rows={12}
-              placeholder="Paste the entire body of the email you received..." 
+              placeholder="Paste the entire body of the email you received..."
               className={getInputClass(emailContent)}
             ></textarea>
           </div>
         )}
 
         {activeTab === 'file' && (
-          <div 
+          <div
             className={`py-16 flex flex-col items-center justify-center border-2 border-dashed rounded-2xl transition-all cursor-pointer ${selectedFile ? 'border-blue-500 bg-blue-50/30' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}
             onClick={() => document.getElementById('fileInput')?.click()}
           >
@@ -230,18 +249,18 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
             </div>
             <p className="text-slate-800 font-bold text-lg">{selectedFile ? selectedFile.name : 'Click to select a file'}</p>
             <p className="text-sm text-slate-500 mt-2 px-6 text-center">Accepts PDF, DOCX, and TXT formats (Max 5MB)</p>
-            <input 
+            <input
               id="fileInput"
-              type="file" 
-              className="hidden" 
-              accept=".pdf,.doc,.docx,.txt"
-              onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+              type="file"
+              className="hidden"
+              accept=".pdf,.docx,.txt"
+              onChange={handleFileChange}
             />
           </div>
         )}
 
         <div className="mt-10 flex justify-end">
-          <button 
+          <button
             type="submit"
             disabled={loadingFile}
             className={`px-12 py-4 bg-blue-600 text-white rounded-xl font-bold text-lg shadow-xl shadow-blue-200 hover:bg-blue-700 transition transform hover:scale-[1.02] active:scale-95 ${loadingFile ? 'opacity-50 cursor-not-allowed' : ''}`}
