@@ -1,24 +1,11 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { JobInputData, AnalysisResult } from "./types";
 
 // Create a helper to get the AI instance.
 const getAI = () => {
   const key = import.meta.env.VITE_GEMINI_API_KEY || "";
-  return new GoogleGenAI({ apiKey: key });
-};
-
-const RESPONSE_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    result: { type: Type.STRING, description: "Either 'Fake Job' or 'Genuine Job'" },
-    confidence_score: { type: Type.NUMBER, description: "Model confidence (0-100)" },
-    risk_rate: { type: Type.NUMBER, description: "Fraud risk (0-100)" },
-    risk_level: { type: Type.STRING, description: "Low, Medium, or High" },
-    explanations: { type: Type.ARRAY, items: { type: Type.STRING } },
-    safety_tips: { type: Type.ARRAY, items: { type: Type.STRING } },
-  },
-  required: ["result", "confidence_score", "risk_rate", "risk_level", "explanations", "safety_tips"],
+  return new GoogleGenAI(key);
 };
 
 // DEMO DATA: Used if the API key is missing or the connection fails.
@@ -47,35 +34,50 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
     return new Promise((resolve) => setTimeout(() => resolve(MOCK_RESULT), 1500));
   }
 
-  const ai = getAI();
-  const modelName = "gemini-1.5-flash"; // More stable than preview models
-
-  const systemInstruction = `
-    You are a world-class Cyber Security Analyst specializing in recruitment fraud.
-    Analyze the job offer and return JSON.
-  `;
-
-  const userPrompt = `Analyze this job: ${JSON.stringify(data)}`;
-
   try {
-    const response = await ai.models.generateContent({
-      model: modelName,
-      contents: userPrompt,
-      config: {
-        systemInstruction: systemInstruction,
+    const genAI = getAI();
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      generationConfig: {
         responseMimeType: "application/json",
-        responseSchema: RESPONSE_SCHEMA,
-      },
+      }
     });
 
-    if (!response.text) {
-      throw new Error("Empty response");
+    const systemInstruction = `
+      You are a world-class Cyber Security Analyst specializing in recruitment fraud and phishing detection.
+      Your task is to analyze job/internship offers for signs of fraud.
+      
+      EVALUATION CRITERIA:
+      1. Financial Red Flags: Asking for "training fees", "equipment deposits", or bank details early.
+      2. Communication: Use of free email domains (@gmail.com, @yahoo.com) for official corporate roles.
+      3. Linguistic Patterns: Excessive urgency, poor grammar, generic greetings, or "too good to be true" salary.
+      4. Authenticity: Vague company details, lack of a physical office, or suspicious website URLs.
+      
+      You must return a JSON response matching this schema:
+      {
+        "result": "Fake Job" | "Genuine Job",
+        "confidence_score": number (0-100),
+        "risk_rate": number (0-100),
+        "risk_level": "Low" | "Medium" | "High",
+        "explanations": string[],
+        "safety_tips": string[]
+      }
+    `;
+
+    const userPrompt = `${systemInstruction}\n\nPlease analyze this job offer: ${JSON.stringify(data)}`;
+
+    const result = await model.generateContent(userPrompt);
+    const response = await result.response;
+    const text = response.text();
+
+    if (!text) {
+      throw new Error("Empty response from AI engine");
     }
 
-    return JSON.parse(response.text.trim()) as AnalysisResult;
+    return JSON.parse(text.trim()) as AnalysisResult;
   } catch (error: any) {
     console.error("Gemini Error, falling back to Demo Mode:", error);
-    // Fallback to demo mode if API fails (e.g., 404, 401, or connection error)
+    // Fallback to demo mode if API fails
     return MOCK_RESULT;
   }
 }

@@ -118,6 +118,12 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
     setSelectedFile(file);
   };
 
+  const getInputClass = (value: string) => {
+    const base = "w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-300 font-medium text-slate-200 placeholder-slate-500";
+    const bgColor = value.length > 0 ? "bg-slate-700 border-blue-900/30" : "bg-slate-800 border-slate-700";
+    return `${base} ${bgColor}`;
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
       <div className="flex border-b bg-slate-50">
@@ -126,8 +132,8 @@ const InputModule: React.FC<InputModuleProps> = ({ onAnalyze }) => {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`flex-1 py-4 text-sm font-bold transition-colors ${activeTab === tab
-                ? 'bg-white text-blue-600 border-b-2 border-blue-600'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+              ? 'bg-white text-blue-600 border-b-2 border-blue-600'
+              : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
               }`}
           >
             {tab === 'manual' && <><i className="fas fa-edit mr-2"></i> Manual Input</>}
