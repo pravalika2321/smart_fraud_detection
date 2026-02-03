@@ -56,7 +56,13 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
     const response = await result.response;
     const text = response.text();
 
-    const parsed = JSON.parse(text.trim());
+    console.log("AI Raw Response:", text);
+
+    if (!text) throw new Error("Empty response from Gemini");
+
+    // Clean JSON: Remove markdown blocks if present
+    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(cleanJson);
 
     // Ensure risk_level consistency
     if (parsed.risk_rate > 60) parsed.risk_level = RiskLevel.HIGH;
@@ -64,9 +70,15 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
     else parsed.risk_level = RiskLevel.LOW;
 
     return parsed as AnalysisResult;
-  } catch (error) {
-    console.error("Analysis Error:", error);
-    return MOCK_RESULT;
+  } catch (error: any) {
+    console.error("Analysis Error Detailed:", error);
+    // Return a visible error state in the mock instead of "Genuine Job" 
+    // to help identify if we are actually in the error block
+    return {
+      ...MOCK_RESULT,
+      result: "Analysis Error",
+      explanations: ["The AI could not process this request correctly. " + error.message]
+    };
   }
 }
 
