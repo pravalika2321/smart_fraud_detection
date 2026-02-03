@@ -2,14 +2,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { JobInputData, AnalysisResult, RiskLevel } from "./types";
 
-// Diagnostic: Check if key exists (without exposing it)
-const key = import.meta.env.VITE_GEMINI_API_KEY;
-if (key) {
-  console.log("Gemini Service: API Key detected (Length: " + key.length + ")");
-} else {
-  console.error("Gemini Service: NO API KEY FOUND in environment!");
-}
-
 const getAI = () => {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
   return new GoogleGenerativeAI(apiKey);
@@ -20,98 +12,77 @@ const MOCK_RESULT: AnalysisResult = {
   confidence_score: 95,
   risk_rate: 5,
   risk_level: RiskLevel.LOW,
-  explanations: [
-    "The recruiter email matches the provided company domain.",
-    "The salary range is within industry standards for this role.",
-    "Company website is aged and has consistent branding."
-  ],
-  safety_tips: [
-    "Always apply through official company portals.",
-    "Never provide bank details during an initial interview."
-  ]
+  explanations: ["Mock data: Recruiter verified."],
+  safety_tips: ["Mock data: Always verify!"]
 };
 
 export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResult> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
-  if (!apiKey || apiKey.includes("YOUR_") || apiKey.includes("sk-")) {
-    console.warn("Using Demo Mode: No valid Gemini API Key found.");
-    return new Promise((resolve) => setTimeout(() => resolve(MOCK_RESULT), 1500));
-  }
+  if (!apiKey || apiKey.includes("YOUR_")) return MOCK_RESULT;
 
   try {
     const genAI = getAI();
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const systemInstruction = `
-      You are a world-class Cyber Security Analyst specializing in recruitment fraud.
-      Analyze the job/internship offer for signs of fraud (scams, phishing, etc.).
-      
-      RETURN JSON ONLY:
-      {
-        "result": "Fake Job" | "Genuine Job",
-        "confidence_score": number,
-        "risk_rate": number,
-        "risk_level": "Low" | "Medium" | "High",
-        "explanations": string[],
-        "safety_tips": string[]
-      }
-    `;
-
-    const result = await model.generateContent(`${systemInstruction}\n\nAnalysis Object: ${JSON.stringify(data)}`);
+    const system = "Analyze job fraud. Return JSON.";
+    const result = await model.generateContent(`${system}\n\n${JSON.stringify(data)}`);
     const response = await result.response;
     const text = response.text();
-
-    if (!text) throw new Error("Empty response");
-
     const parsed = JSON.parse(text.trim());
-
-    // Enum mapping
-    if (parsed.risk_level === 'Low') parsed.risk_level = RiskLevel.LOW;
-    else if (parsed.risk_level === 'Medium') parsed.risk_level = RiskLevel.MEDIUM;
-    else if (parsed.risk_level === 'High') parsed.risk_level = RiskLevel.HIGH;
-
     return parsed as AnalysisResult;
-  } catch (error: any) {
-    console.error("Gemini Analysis Error:", error);
+  } catch (error) {
+    console.error("Analysis Error:", error);
     return MOCK_RESULT;
   }
 }
 
 export async function chatWithAI(message: string, history: any[]): Promise<string> {
   const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  console.log("Chatbot: Attempting request...");
 
-  if (!apiKey || apiKey.includes("YOUR_") || apiKey.includes("sk-")) {
-    return "I'm currently in Demo Mode. I can help you with general questions about job fraud and internships based on my built-in knowledge!";
+  if (!apiKey || apiKey.includes("YOUR_")) {
+    return "Demo Mode: Configure a valid API key to chat!";
   }
 
   try {
     const genAI = getAI();
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
+      systemInstruction: "You are a helpful Career Assistant for FraudGuard. Help users find job scams and stay safe. Keep it short."
     });
 
-    // Format history for @google/generative-ai
-    const formattedHistory = history.map(h => ({
-      role: h.role === 'model' ? 'model' : 'user',
-      parts: Array.isArray(h.parts) ? h.parts : [{ text: h.text }]
-    }));
+    // CRITICAL: Gemini history MUST start with 'user' role. 
+    // We filter out the initial model greeting.
+    const validHistory = history
+      .filter((h, index) => {
+        // Only keep messages if history has already started with a user message
+        const firstUserIndex = history.findIndex(m => m.role === 'user');
+        return index >= firstUserIndex && firstUserIndex !== -1;
+      })
+      .map(h => ({
+        role: h.role === 'model' ? 'model' : 'user',
+        parts: [{ text: h.text || h.parts[0].text }]
+      }));
+
+    console.log("Chatbot: History prepared (Count:", validHistory.length, ")");
 
     const chat = model.startChat({
-      history: formattedHistory,
-      generationConfig: {
-        maxOutputTokens: 1000,
-      },
+      history: validHistory,
     });
 
     const result = await chat.sendMessage(message);
     const response = await result.response;
-    return response.text();
+    const text = response.text();
+
+    console.log("Chatbot: Success!");
+    return text;
   } catch (error: any) {
-    console.error("Chat Error:", error);
-    if (error.message?.includes("API key")) {
-      return "There's an issue with the API key configuration. Please check your settings.";
+    console.error("Chatbot Technical Error:", error);
+
+    // Check for specific error types to help the user
+    if (error.message?.includes("API key not valid")) {
+      return "Error: The Gemini API Key provided is invalid. Please double check your .env file.";
     }
-    return "I'm having trouble connecting to my brain right now. Please try again in a few seconds!";
+
+    return "I'm having a connection issue. Please check your internet or API key limits.";
   }
 }
