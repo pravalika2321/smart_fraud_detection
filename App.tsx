@@ -8,6 +8,7 @@ import AboutPage from './components/AboutPage';
 import HowItWorks from './components/HowItWorks';
 import ContactUs from './components/ContactUs';
 import Testimonials from './components/Testimonials';
+import Chatbot from './components/Chatbot';
 import { JobInputData, AnalysisResult } from './types';
 import { analyzeJobOffer } from './geminiService';
 
@@ -64,11 +65,11 @@ const App: React.FC = () => {
         );
       case 'results':
         return (
-          <ResultsView 
-            loading={loading} 
-            result={result} 
-            error={error} 
-            onReset={() => setCurrentView('analyze')} 
+          <ResultsView
+            loading={loading}
+            result={result}
+            error={error}
+            onReset={() => setCurrentView('analyze')}
           />
         );
       case 'about':
@@ -88,6 +89,7 @@ const App: React.FC = () => {
       <main className="flex-grow pt-16">
         {renderView()}
       </main>
+      <Chatbot />
       <footer className="bg-slate-900 text-slate-400 py-12">
         <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
           <div>

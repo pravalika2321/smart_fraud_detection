@@ -2,9 +2,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { JobInputData, AnalysisResult, RiskLevel } from "./types";
 
-const getAI = () => {
+const getClient = () => {
   const key = import.meta.env.VITE_GEMINI_API_KEY || "";
-  return new GoogleGenAI(key);
+  return new GoogleGenAI({ apiKey: key });
 };
 
 const MOCK_RESULT: AnalysisResult = {
@@ -32,9 +32,7 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
   }
 
   try {
-    const genAI = getAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
+    const client = getClient();
     const systemInstruction = `
       You are a world-class Cyber Security Analyst specializing in recruitment fraud.
       Analyze the job/internship offer for signs of fraud (scams, phishing, etc.).
@@ -50,12 +48,15 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
       }
     `;
 
-    const userPrompt = `${systemInstruction}\n\nAnalysis Object: ${JSON.stringify(data)}`;
+    const response = await client.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: [`${systemInstruction}\n\nAnalysis Object: ${JSON.stringify(data)}`],
+      config: {
+        responseMimeType: "application/json",
+      }
+    });
 
-    const result = await model.generateContent(userPrompt);
-    const response = await result.response;
-    const text = response.text();
-
+    const text = response.text;
     if (!text) throw new Error("Empty response");
 
     const parsed = JSON.parse(text.trim());
@@ -69,5 +70,42 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
   } catch (error: any) {
     console.error("Gemini Error:", error);
     return MOCK_RESULT;
+  }
+}
+
+export async function chatWithAI(message: string, history: any[]): Promise<string> {
+  const key = import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (!key || key.includes("YOUR_") || key.includes("sk-")) {
+    return "I'm currently in Demo Mode. I can help you with general questions about job fraud and internships based on my built-in knowledge! For full AI features, please configure a valid API key.";
+  }
+
+  try {
+    const client = getClient();
+
+    // Convert history to @google/genai format
+    // The history passed from Chatbot is [{role, parts: [{text}]}]
+    // We need to pass it in contents
+    const contents = history.map(h => ({
+      role: h.role === 'model' ? 'assistant' : 'user',
+      parts: h.parts
+    }));
+
+    // Add current message
+    contents.push({
+      role: 'user',
+      parts: [{ text: message }]
+    });
+
+    const response = await client.models.generateContent({
+      model: "gemini-1.5-flash",
+      contents: contents,
+      systemInstruction: "You are a helpful Career Assistant on the FraudGuard platform. Your goal is to help users identify job scams, give internship advice, and explain how to stay safe during job hunting. Keep responses concise and professional."
+    });
+
+    return response.text || "I'm sorry, I couldn't generate a response.";
+  } catch (error: any) {
+    console.error("Chat Error:", error);
+    return "I'm having a bit of trouble connecting to my brain right now, but I'm still here to help! Ask me anything about job safety.";
   }
 }
