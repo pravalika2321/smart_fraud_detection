@@ -1,10 +1,18 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { JobInputData, AnalysisResult, RiskLevel } from "./types";
 
-const getClient = () => {
-  const key = import.meta.env.VITE_GEMINI_API_KEY || "";
-  return new GoogleGenAI({ apiKey: key });
+// Diagnostic: Check if key exists (without exposing it)
+const key = import.meta.env.VITE_GEMINI_API_KEY;
+if (key) {
+  console.log("Gemini Service: API Key detected (Length: " + key.length + ")");
+} else {
+  console.error("Gemini Service: NO API KEY FOUND in environment!");
+}
+
+const getAI = () => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+  return new GoogleGenerativeAI(apiKey);
 };
 
 const MOCK_RESULT: AnalysisResult = {
@@ -24,15 +32,17 @@ const MOCK_RESULT: AnalysisResult = {
 };
 
 export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResult> {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  if (!key || key.includes("YOUR_") || key.includes("sk-")) {
+  if (!apiKey || apiKey.includes("YOUR_") || apiKey.includes("sk-")) {
     console.warn("Using Demo Mode: No valid Gemini API Key found.");
     return new Promise((resolve) => setTimeout(() => resolve(MOCK_RESULT), 1500));
   }
 
   try {
-    const client = getClient();
+    const genAI = getAI();
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
     const systemInstruction = `
       You are a world-class Cyber Security Analyst specializing in recruitment fraud.
       Analyze the job/internship offer for signs of fraud (scams, phishing, etc.).
@@ -48,18 +58,10 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
       }
     `;
 
-    const response = await client.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: [{
-        role: "user",
-        parts: [{ text: `${systemInstruction}\n\nAnalysis Object: ${JSON.stringify(data)}` }]
-      }],
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
+    const result = await model.generateContent(`${systemInstruction}\n\nAnalysis Object: ${JSON.stringify(data)}`);
+    const response = await result.response;
+    const text = response.text();
 
-    const text = response.text;
     if (!text) throw new Error("Empty response");
 
     const parsed = JSON.parse(text.trim());
@@ -71,43 +73,45 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
 
     return parsed as AnalysisResult;
   } catch (error: any) {
-    console.error("Gemini Error:", error);
+    console.error("Gemini Analysis Error:", error);
     return MOCK_RESULT;
   }
 }
 
 export async function chatWithAI(message: string, history: any[]): Promise<string> {
-  const key = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
-  if (!key || key.includes("YOUR_") || key.includes("sk-")) {
-    return "I'm currently in Demo Mode. I can help you with general questions about job fraud and internships based on my built-in knowledge! For full AI features, please configure a valid API key.";
+  if (!apiKey || apiKey.includes("YOUR_") || apiKey.includes("sk-")) {
+    return "I'm currently in Demo Mode. I can help you with general questions about job fraud and internships based on my built-in knowledge!";
   }
 
   try {
-    const client = getClient();
+    const genAI = getAI();
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+    });
 
-    // Convert history to @google/genai format
-    // Gemini API roles are 'user' and 'model'
-    const contents = history.map(h => ({
+    // Format history for @google/generative-ai
+    const formattedHistory = history.map(h => ({
       role: h.role === 'model' ? 'model' : 'user',
-      parts: h.parts
+      parts: Array.isArray(h.parts) ? h.parts : [{ text: h.text }]
     }));
 
-    // Add current message
-    contents.push({
-      role: 'user',
-      parts: [{ text: message }]
+    const chat = model.startChat({
+      history: formattedHistory,
+      generationConfig: {
+        maxOutputTokens: 1000,
+      },
     });
 
-    const response = await client.models.generateContent({
-      model: "gemini-1.5-flash",
-      contents: contents,
-      systemInstruction: "You are a helpful Career Assistant on the FraudGuard platform. Your goal is to help users identify job scams, give internship advice, and explain how to stay safe during job hunting. Keep responses concise and professional."
-    });
-
-    return response.text || "I'm sorry, I couldn't generate a response.";
+    const result = await chat.sendMessage(message);
+    const response = await result.response;
+    return response.text();
   } catch (error: any) {
     console.error("Chat Error:", error);
-    return "I'm having a bit of trouble connecting right now. Please try again in a few seconds.";
+    if (error.message?.includes("API key")) {
+      return "There's an issue with the API key configuration. Please check your settings.";
+    }
+    return "I'm having trouble connecting to my brain right now. Please try again in a few seconds!";
   }
 }
