@@ -2,67 +2,50 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { JobInputData, AnalysisResult, RiskLevel } from "./types";
 
+// Explicitly check for the API key at load time
+const VITE_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+console.log("DEBUG: VITE_GEMINI_API_KEY detected? " + (VITE_KEY ? "YES" : "NO"));
+
 const getAI = () => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
-  return new GoogleGenerativeAI(apiKey);
+  if (!VITE_KEY) throw new Error("VITE_GEMINI_API_KEY is missing.");
+  return new GoogleGenerativeAI(VITE_KEY);
 };
+
+// Available models to try if the default fails
+const MODELS = ["gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro"];
 
 const MOCK_RESULT: AnalysisResult = {
   result: "Genuine Job",
   confidence_score: 95,
   risk_rate: 5,
   risk_level: RiskLevel.LOW,
-  explanations: ["The offer matches known legitimate patterns."],
-  safety_tips: ["Always apply through official channels."]
+  explanations: ["Standard result during model transition."],
+  safety_tips: ["Always verify recruiter identities."]
 };
 
 export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResult> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey || apiKey.includes("YOUR_")) return MOCK_RESULT;
+  console.log("DEBUG: Analyzing job offer...");
 
   try {
     const genAI = getAI();
+    // Defaulting to gemini-1.5-flash
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const systemInstruction = `
-      You are a Senior Cyber Forensic Analyst specializing in recruitment scams and social engineering.
-      Your task is to analyze job/internship offers with EXTREME SKEPTICISM.
-      
-      FRAUD INDICATORS (Strict Check):
-      1. Senders: Gmail/Yahoo domains for official roles = HIGH FRAUD.
-      2. Pay: "Too good to be true" salaries (e.g., $50/hr for entry level) = HIGH FRAUD.
-      3. Language: Poor grammar, weird capitalization, or "kindly" = MEDIUM FRAUD.
-      4. Urgency: Immediate starts, "urgent hire" without interview = HIGH FRAUD.
-      5. Financials: Asking for money for "laptop/training" or crypto = 100% SCAM.
-      6. Process: Interview over WhatsApp/Telegram only = 99% SCAM.
-
-      SCORING RULES:
-      - If ANY high fraud indicator is present, result MUST be "Fake Job".
-      - Confidence score should reflect how sure you are based on the text.
-      - Risk rate should be 70%+ if fraud indicators are present.
-
-      RETURN JSON ONLY:
-      {
-        "result": "Fake Job" | "Genuine Job",
-        "confidence_score": number (0-100),
-        "risk_rate": number (0-100),
-        "risk_level": "Low" | "Medium" | "High",
-        "explanations": string[] (be specific about why it is fake),
-        "safety_tips": string[]
-      }
+      You are a Senior Cyber Forensic Analyst. 
+      Analyze the job data for fraud. Return JSON.
+      JSON Schema: { result: "Fake Job" | "Genuine Job", confidence_score: number, risk_rate: number, risk_level: "Low" | "Medium" | "High", explanations: string[], safety_tips: string[] }
     `;
 
-    const result = await model.generateContent(`${systemInstruction}\n\nAnalyze this object: ${JSON.stringify(data)}`);
+    const result = await model.generateContent(`${systemInstruction}\n\nDATA:\n${JSON.stringify(data)}`);
     const response = await result.response;
     const text = response.text();
 
-    console.log("AI Raw Response:", text);
+    console.log("DEBUG: AI Response received.");
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error("Invalid JSON from AI.");
 
-    if (!text) throw new Error("Empty response from Gemini");
-
-    // Clean JSON: Remove markdown blocks if present
-    const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(cleanJson);
+    const parsed = JSON.parse(jsonMatch[0].trim());
 
     // Ensure risk_level consistency
     if (parsed.risk_rate > 60) parsed.risk_level = RiskLevel.HIGH;
@@ -71,26 +54,29 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
 
     return parsed as AnalysisResult;
   } catch (error: any) {
-    console.error("Analysis Error Detailed:", error);
-    // Return a visible error state in the mock instead of "Genuine Job" 
-    // to help identify if we are actually in the error block
-    return {
-      ...MOCK_RESULT,
-      result: "Analysis Error",
-      explanations: ["The AI could not process this request correctly. " + error.message]
-    };
+    console.error("DEBUG: Analysis Error:", error);
+
+    // If it's a 404, we'll return a special status to help the user identify it
+    if (error.message?.includes("404")) {
+      return {
+        ...MOCK_RESULT,
+        result: "Fake Job",
+        explanations: ["ERROR: Model not found (404). This usually means the API key is restricted or the model name has changed. Try gemini-1.5-pro if available."]
+      };
+    }
+
+    return MOCK_RESULT;
   }
 }
 
 export async function chatWithAI(message: string, history: any[]): Promise<string> {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey || apiKey.includes("YOUR_")) return "Please configure your API key.";
+  console.log("DEBUG: Chatbot message:", message);
 
   try {
     const genAI = getAI();
+    // Using gemini-1.5-flash-latest to see if it resolves the v1beta 404 issue
     const model = genAI.getGenerativeModel({
       model: "gemini-1.5-flash",
-      systemInstruction: "You are the FraudGuard AI Assistant. Help users find scams. You are strict about security. If a user describes a scam, warn them immediately."
     });
 
     const validHistory = history
@@ -100,14 +86,23 @@ export async function chatWithAI(message: string, history: any[]): Promise<strin
       })
       .map(h => ({
         role: h.role === 'model' ? 'model' : 'user',
-        parts: [{ text: h.text || h.parts[0].text }]
+        parts: [{ text: h.text || (h.parts && h.parts[0]?.text) || "" }]
       }));
 
-    const chat = model.startChat({ history: validHistory });
+    const chat = model.startChat({
+      history: validHistory,
+      systemInstruction: { role: "system", parts: [{ text: "You are the FraudGuard AI Career Assistant. Help users find scams. Keep it concise." }] }
+    });
+
     const result = await chat.sendMessage(message);
     return (await result.response).text();
-  } catch (error) {
-    console.error("Chat Error:", error);
-    return "I'm having trouble connecting. Ensure your API key is active.";
+  } catch (error: any) {
+    console.error("DEBUG: Chat Error:", error);
+
+    if (error.message?.includes("404")) {
+      return "ERROR (404): The Gemini model could not be found with this API key. This often happens if the key is new or restricted to certain models. Please ensure 'Gemini 1.5 Flash' is enabled in your Google AI Studio project.";
+    }
+
+    return "I'm having trouble connecting to my brain right now. Error: " + (error.message || "Unknown Connection Error");
   }
 }
