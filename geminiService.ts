@@ -50,7 +50,10 @@ export async function analyzeJobOffer(data: JobInputData): Promise<AnalysisResul
 
     const response = await client.models.generateContent({
       model: "gemini-1.5-flash",
-      contents: [`${systemInstruction}\n\nAnalysis Object: ${JSON.stringify(data)}`],
+      contents: [{
+        role: "user",
+        parts: [{ text: `${systemInstruction}\n\nAnalysis Object: ${JSON.stringify(data)}` }]
+      }],
       config: {
         responseMimeType: "application/json",
       }
@@ -84,10 +87,9 @@ export async function chatWithAI(message: string, history: any[]): Promise<strin
     const client = getClient();
 
     // Convert history to @google/genai format
-    // The history passed from Chatbot is [{role, parts: [{text}]}]
-    // We need to pass it in contents
+    // Gemini API roles are 'user' and 'model'
     const contents = history.map(h => ({
-      role: h.role === 'model' ? 'assistant' : 'user',
+      role: h.role === 'model' ? 'model' : 'user',
       parts: h.parts
     }));
 
@@ -106,6 +108,6 @@ export async function chatWithAI(message: string, history: any[]): Promise<strin
     return response.text || "I'm sorry, I couldn't generate a response.";
   } catch (error: any) {
     console.error("Chat Error:", error);
-    return "I'm having a bit of trouble connecting to my brain right now, but I'm still here to help! Ask me anything about job safety.";
+    return "I'm having a bit of trouble connecting right now. Please try again in a few seconds.";
   }
 }
