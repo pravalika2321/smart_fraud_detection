@@ -70,8 +70,11 @@ const Chatbot: React.FC = () => {
                             <div className="text-left">
                                 <h3 className="font-bold tracking-tight">Career Assistant</h3>
                                 <div className="flex items-center space-x-1.5">
-                                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
-                                    <span className="text-[10px] font-bold text-blue-100 uppercase tracking-widest">Always Online</span>
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                    </span>
+                                    <span className="text-[10px] font-bold text-blue-100 uppercase tracking-widest">Live Sync Active</span>
                                 </div>
                             </div>
                         </div>
@@ -89,8 +92,8 @@ const Chatbot: React.FC = () => {
                             >
                                 <div
                                     className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 rounded-tr-none'
-                                            : 'bg-white text-slate-700 shadow-sm border border-slate-100 rounded-tl-none'
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-100 rounded-tr-none'
+                                        : 'bg-white text-slate-700 shadow-sm border border-slate-100 rounded-tl-none'
                                         }`}
                                 >
                                     {msg.text}
